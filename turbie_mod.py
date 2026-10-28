@@ -1,4 +1,4 @@
-"""File turbie_mod.py"""
+"""Functions to read the inputs and simulate Turbie, a 2DOF model of 10 MW wind turbine."""
 import numpy as np
 
 
@@ -22,6 +22,7 @@ def read_wind_file(filename):
 
     time, wind_speed = np.loadtxt(filename, skiprows=1, unpack=True)
     return time, wind_speed
+
 
 # C_T results from a mean wind speed and interpolation of the C_T table
 
@@ -69,7 +70,7 @@ def get_C_T(mean_wind_speed, C_T_table):
     return C_T
 
 
-# Make matrix M, C  and K with turbie parameters
+# Make matrix M, C and K with turbie parameters
 
 def read_turbie_parameters(filename):
     """Read the Turbie parameters from a file and return an array with the parameters.
@@ -90,6 +91,7 @@ def read_turbie_parameters(filename):
     parameters = np.loadtxt(filename, skiprows=1)
 
     return parameters
+
 
 def get_turbie_parameters(parameters):
     """Extract the Turbie parameters from the array as individual variables.
@@ -143,6 +145,7 @@ def get_turbie_parameters(parameters):
 
     return mb, mn, mh, mt, c1, c2, k1, k2, fb, ft, drb, drt, Dr, rho
 
+
 def calculate_MCK_matrix(mb, mn, mh, mt, c1, c2, k1, k2):
     """Calculate the mass, damping, and stiffness matrices for the Turbie system.
 
@@ -184,12 +187,15 @@ def calculate_MCK_matrix(mb, mn, mh, mt, c1, c2, k1, k2):
     
     return M, C, K
 
-# Calculate the state derivate y´(t) for solve_ivp
+
+# Calculate the state derivative y'(t) for solve_ivp
 
 def state_derivative(t, y, M, C, K, time, wind_speed, C_T, rho, A): 
     """Calculate the state derivative y'(t) for the Turbie system.
 
     First the wind speed is interpolated at time t, then the aerodynamic force on the rotor (thrust) is calculated.
+
+    F_aero: 0.5 * rho * C_T * A * (u(t) - x'_1) * | u(t) - x'_1|
 
     Parameters
     ----------
@@ -216,10 +222,8 @@ def state_derivative(t, y, M, C, K, time, wind_speed, C_T, rho, A):
 
     Returns
     -------
-    dy/dt: np.ndarray
+    dydt : np.ndarray
         The state derivative vector [x1_dot, x2_dot, x1_ddot, x2_ddot] [m/s, m/s, m/s^2, m/s^2].
-
-    F_aero: 0.5 * rho * C_t * A * (u(t) - x'_1) * | u(t) - x'_1|
     """
     # Extract the displacements and velocities from the state vector
     # y = [x1, x2, x1_dot, x2_dot]
@@ -241,5 +245,5 @@ def state_derivative(t, y, M, C, K, time, wind_speed, C_T, rho, A):
     # Acceleration from the equation of motion: M*a + C*v + K*x = F 
     a = np.linalg.solve(M, F - np.dot(C, v) - np.dot(K, x))  # Acceleration [m/s^2]
 
-    # Return the state derivative vector [[x1_dot, x2_dot], [x1_ddot, x2_ddot]]
+    # Return the state derivative vector [x1_dot, x2_dot, x1_ddot, x2_ddot]
     return np.concatenate((v, a))
