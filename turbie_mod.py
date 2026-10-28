@@ -92,7 +92,7 @@ def read_turbie_parameters(filename):
     return parameters
 
 def get_turbie_parameters(parameters):
-    """Extract the Turbie parameters from the array and return them as individual variables.
+    """Extract the Turbie parameters from the array as individual variables.
 
     Parameters
     ----------
@@ -104,7 +104,7 @@ def get_turbie_parameters(parameters):
     Returns
     -------
     mb : float
-        Mass of the base [kg].
+        Mass of a single blade [kg].
     mn : float
         Mass of the nacelle [kg].
     mh : float
@@ -112,21 +112,21 @@ def get_turbie_parameters(parameters):
     mt : float
         Mass of the tower [kg].
     c1 : float
-        Damping coefficient for the base [N/(m/s)].
+        Equivalent damping of the blades [N/(m/s)].
     c2 : float
-        Damping coefficient for the tower [N/(m/s)].
+        Equivalent damping of the nacelle, hub and tower [N/(m/s)].
     k1 : float
-        Stiffness coefficient for the base [N/m].
+        Equivalent stiffness of the blades [N/m].
     k2 : float
-        Stiffness coefficient for the tower [N/m].
+        Equivalent stiffness of the nacelle, hub and tower [N/m].
     fb : float
-        Natural frequency of the base [Hz].
+        Natural frequency of the blades [Hz].
     ft : float
         Natural frequency of the tower [Hz].
     drb : float
-        Damping ratio for the base [-].
+        Damping ratio of the blades [-].
     drt : float
-        Damping ratio for the tower [-].
+        Damping ratio of the tower [-].
     Dr : float
         Rotor diameter [m].
     rho : float
@@ -149,7 +149,7 @@ def calculate_MCK_matrix(mb, mn, mh, mt, c1, c2, k1, k2):
     Parameters
     ----------
     mb : float
-        Mass of the base [kg].
+        Mass of a single blade [kg].
     mn : float
         Mass of the nacelle [kg].
     mh : float
@@ -157,13 +157,13 @@ def calculate_MCK_matrix(mb, mn, mh, mt, c1, c2, k1, k2):
     mt : float
         Mass of the tower [kg].
     c1 : float
-        Damping coefficient for the base [N/(m/s)].
+        Equivalent damping of the blades [N/(m/s)].
     c2 : float
-        Damping coefficient for the tower [N/(m/s)].
+        Equivalent damping of the nacelle, hub and tower [N/(m/s)].
     k1 : float
-        Stiffness coefficient for the base [N/m].
+        Equivalent stiffness of the blades [N/m].
     k2 : float
-        Stiffness coefficient for the tower [N/m].
+        Equivalent stiffness of the nacelle, hub and tower [N/m].
 
     Returns
     -------
@@ -179,15 +179,67 @@ def calculate_MCK_matrix(mb, mn, mh, mt, c1, c2, k1, k2):
     m2 = mn + mh + mt
     
     M = np.array([[m1, 0], [0, m2]])
-    C = np.array([[c1, -c1], [-c1, c1+c2]])
-    K = np.array([[k1, -k1], [-k1, k1+k2]])
+    C = np.array([[c1, -c1], [-c1, c1 + c2]])
+    K = np.array([[k1, -k1], [-k1, k1 + k2]])
     
     return M, C, K
 
-
 # Calculate the state derivate y´(t) for solve_ivp
 
+def state_derivative(t, y, M, C, K, time, wind_speed, C_T, rho, A): 
+    """Calculate the state derivative y'(t) for the Turbie system.
 
+    First the wind speed is interpolated at time t, then the aerodynamic force on the rotor (thrust) is calculated.
 
+    Parameters
+    ----------
+    t : float
+        Current time [s].
+    y : np.ndarray
+        State vector [x1, x2, x1_dot, x2_dot] [m, m, m/s, m/s].
+    M : np.ndarray
+        2x2 mass matrix [kg].
+    C : np.ndarray
+        2x2 damping matrix [N/(m/s)].
+    K : np.ndarray
+        2x2 stiffness matrix [N/m].
+    time : np.ndarray
+        Time values of the wind time series [s].
+    wind_speed : np.ndarray
+        Wind speed values of the wind time series [m/s].
+    C_T : float
+        Thrust coefficient [-].
+    rho : float
+        Air density [kg/m^3].
+    A : float
+        Rotor swept area [m^2].
 
+    Returns
+    -------
+    dy/dt: np.ndarray
+        The state derivative vector [x1_dot, x2_dot, x1_ddot, x2_ddot] [m/s, m/s, m/s^2, m/s^2].
 
+    F_aero: 0.5 * rho * C_t * A * (u(t) - x'_1) * | u(t) - x'_1|
+    """
+    # Extract the displacements and velocities from the state vector
+    # y = [x1, x2, x1_dot, x2_dot]
+    x = y[0:2]  # [x1, x2] displacements [m]
+    v = y[2:4]  # [x1_dot, x2_dot] velocities [m/s]
+
+    # Interpolate the wind speed at time t
+    u_t = np.interp(t, time, wind_speed)
+
+    # Relative wind speed at the rotor (considering the blade velocity)
+    u_rel = u_t - v[0]  # Relative wind speed [m/s]
+
+    # Calculate the aerodynamic force (thrust) on the rotor
+    F_aero = 0.5 * rho * C_T * A * u_rel * abs(u_rel)  # Aerodynamic force [N]
+
+    # Force vector (only the blade is affected by the aerodynamic force)
+    F = np.array([F_aero, 0])  # Force vector [N]
+
+    # Acceleration from the equation of motion: M*a + C*v + K*x = F 
+    a = np.linalg.solve(M, F - np.dot(C, v) - np.dot(K, x))  # Acceleration [m/s^2]
+
+    # Return the state derivative vector [[x1_dot, x2_dot], [x1_ddot, x2_ddot]]
+    return np.concatenate((v, a))
