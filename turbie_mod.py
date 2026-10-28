@@ -188,6 +188,25 @@ def calculate_MCK_matrix(mb, mn, mh, mt, c1, c2, k1, k2):
     return M, C, K
 
 
+# Calculate the swept area of the rotor from the rotor diameter
+def calculate_rotor_area(Dr):
+    """Calculate the swept area of the rotor from the rotor diameter.
+
+    Parameters
+    ----------
+    Dr : float
+        Rotor diameter [m].
+
+    Returns
+    -------
+    A : float
+        Swept area of the rotor [m^2].
+    """
+    
+    A = np.pi * (Dr / 2)**2
+    
+    return A
+
 # Calculate the state derivative y'(t) for solve_ivp
 
 def state_derivative(t, y, M, C, K, time, wind_speed, C_T, rho, A): 
