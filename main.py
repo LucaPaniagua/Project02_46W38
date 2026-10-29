@@ -201,3 +201,35 @@ for ti_folder in sorted(wind_folder.iterdir()):
 
     # Keep the statistics of this TI category for the plots
     all_statistics[ti_folder.name] = statistics
+
+
+# --- Statistics plot: mean and standard deviation vs mean wind speed ---
+fig, axs = plt.subplots(2, 2, figsize=(12, 8), sharex=True)
+fig.suptitle("Turbie displacement statistics vs mean wind speed")
+
+# One curve per TI category in each panel
+for ti_name, statistics in all_statistics.items():
+    ti_label = "TI = " + ti_name.split("_")[-1]
+    wind = statistics[:, 0]
+
+    axs[0, 0].plot(wind, statistics[:, 1], marker="o", label=ti_label)  # mean x1
+    axs[1, 0].plot(wind, statistics[:, 2], marker="o", label=ti_label)  # std x1
+    axs[0, 1].plot(wind, statistics[:, 3], marker="o", label=ti_label)  # mean x2
+    axs[1, 1].plot(wind, statistics[:, 4], marker="o", label=ti_label)  # std x2
+
+# Titles of the columns and labels of the axes
+axs[0, 0].set_title("Blades (x1)")
+axs[0, 1].set_title("Tower (x2)")
+axs[0, 0].set_ylabel("Mean displacement [m]")
+axs[1, 0].set_ylabel("Std of displacement [m]")
+axs[1, 0].set_xlabel("Mean wind speed [m/s]")
+axs[1, 1].set_xlabel("Mean wind speed [m/s]")
+
+for ax in axs.flat:
+    ax.grid(True)
+axs[0, 0].legend()
+fig.tight_layout()
+
+# Save the figure and close it
+fig.savefig(output_folder / "statistics_vs_wind_speed.png", dpi=300)
+plt.close(fig)
